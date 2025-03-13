@@ -1,0 +1,196 @@
+version: '3.3'
+
+services:
+
+  # Databases
+  db-device:
+    image: postgres:13-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: 1q2w3e4r
+      POSTGRES_DB: devices-db
+    networks:
+      - shared-network
+#    volumes:
+#      - db-device-data:/var/lib/postgresql/data
+
+  db-user:
+    image: postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: 1q2w3e4r
+      POSTGRES_DB: persons-db
+    networks:
+      - shared-network
+#    volumes:
+#        - db-user-data:/var/lib/postgresql/data
+
+  db-measurement:
+    image: postgres:13-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: 1q2w3e4r
+      POSTGRES_DB: moncom-devices-db
+    networks:
+      - shared-network
+#    volumes:
+#        - db-measurement-data:/var/lib/postgresql/data
+
+
+  # User Service
+  tomcat-db-api:
+    restart: always
+    build:
+      context: ./spring-users
+    environment:
+      DB_IP: db-user
+      DB_PORT: 5432
+      DB_USERNAME: postgres
+      DB_PASSWORD: 1q2w3e4r
+      DB_DBNAME: persons-db
+    depends_on:
+      - db-user
+    networks:
+      - shared-network
+   # deploy:
+   #   replicas: 2
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.tomcat-db-api.rule=Host(`tomcat-db-api.localhost`)"
+      - "traefik.http.services.tomcat-db-api.loadbalancer.server.port=8080"
+
+
+
+  # Device Service
+  tomcat-db-api2:
+    restart: always
+    build:
+      context: ./spring-devices
+    environment:
+      DB_IP: db-device
+      DB_PORT: 5432
+      DB_USERNAME: postgres
+      DB_PASSWORD: 1q2w3e4r
+      DB_DBNAME: devices-db
+      RABBITMQ_HOST: localhost
+      RABBITMQ_PORT: 5672
+      RABBITMQ_QUEUE: device_queue
+      RABBITMQ_EXCHANGE: device_data
+      RABBITMQ_ROUTING_KEY: device_routing_key
+    depends_on:
+      - rabbitmq2
+      - db-device
+    networks:
+      - shared-network
+   # deploy:
+   #     replicas: 2
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.tomcat-db-api2.rule=Host(`tomcat-db-api2.localhost`)"
+      - "traefik.http.services.tomcat-db-api2.loadbalancer.server.port=8081"
+
+
+
+  # Measurement Service
+  tomcat-db-api3:
+    restart: always
+    build:
+      context: ./spring-monitoring-communication
+    environment:
+      DB_IP: db-measurement
+      DB_PORT: 5432
+      DB_USERNAME: postgres
+      DB_PASSWORD: 1q2w3e4r
+      DB_DBNAME: moncom-devices-db
+      RABBITMQ_HOST: localhost
+      RABBITMQ_PORT: 5672
+      RABBITMQ_QUEUE: device_energy_consumption_queue
+      RABBITMQ_EXCHANGE: device_energy
+      RABBITMQ_ROUTING_KEY: device.energy.consumption.sensor
+    depends_on:
+      - rabbitmq2
+      - db-measurement
+    networks:
+      - shared-network
+    #deploy:
+    #    replicas: 1
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.tomcat-db-api3.rule=Host(`tomcat-db-api3.localhost`)"
+      - "traefik.http.services.tomcat-db-api3.loadbalancer.server.port=8083"
+
+  # RabbitMQ
+  rabbitmq2:
+    image: rabbitmq:3-management
+    container_name: rabbitmq2
+    ports:
+      - "5672:5672"    # AMQP port
+      - "15672:15672"  # Management UI
+    environment:
+      RABBITMQ_HOST: localhost
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+    volumes:
+      - ./rabbitmq-init:/etc/rabbitmq/init:ro
+    networks:
+      - shared-network
+
+
+
+  # Chat Service
+  tomcat-db-api4:
+    restart: always
+    build:
+      context: ./spring-chat
+    networks:
+      - shared-network
+   # deploy:
+   #   replicas: 1
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.tomcat-db-api4.rule=Host(`tomcat-db-api4.localhost`)"
+      - "traefik.http.services.tomcat-db-api4.loadbalancer.server.port=8082"
+
+
+
+  # Reverse Proxy - Traefik
+  reverse-proxy:
+    image: traefik:v3.2
+    container_name: traefik
+    command:
+      - --api.insecure=true
+      - --api.dashboard=true
+      - --providers.docker
+      - --accesslog=true
+      - --accesslog.filepath=/var/log/traefik/access.log
+      - --log.level=DEBUG
+      - --entrypoints.web.address=:80
+    ports:
+      - "80:80"     # HTTP traffic
+      - "8080:8080" # Traefik dashboard
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    networks:
+      - shared-network
+
+
+  # Frontend Service
+  react-app:
+    image: fe-image
+    build:
+      context: ./react-demo
+    ports:
+      - "3000:3000"
+    networks:
+      - shared-network
+
+
+networks:
+  shared-network:
+    external: true
+
+#
+#volumes:
+#  db-device-data:
+#  db-user-data:
+#  db-measurement-data:

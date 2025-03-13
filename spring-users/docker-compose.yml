@@ -1,0 +1,39 @@
+version: '3.3'
+
+services:
+  tomcat-db-api:
+    container_name: tomcat-db-api
+    image: api-image  # Replace "your_image_name" with the name provided during the build step
+    build:
+      context: .
+    #ports:
+    #  - "8080:8080"  # Map container's port 8080 to host's port 8080
+    environment:
+      DB_IP: db  # Update with your database name
+      DB_PORT: 5432
+      DB_USERNAME: postgres
+      DB_PASSWORD: 1q2w3e4r
+      DB_DBNAME: persons-db
+    depends_on:
+      - db
+    networks:
+      - demo_net
+    labels:
+        - "traefik.enable=true"
+        - "traefik.http.routers.tomcat-db-api.rule=Host(`tomcat-db-api.localhost`)"
+        - "traefik.http.services.tomcat-db-api.loadbalancer.server.port=8080"
+
+  db:
+    image: postgres
+    container_name: my-postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: 1q2w3e4r
+      POSTGRES_DB: persons-db   # Update with your database name
+    ports:
+      - "5433:5432"  # Optional: Expose PostgreSQL on port 5433 if needed
+    networks:
+      - demo_net
+networks:
+  demo_net:
+    external: true

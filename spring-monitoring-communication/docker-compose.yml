@@ -1,0 +1,60 @@
+version: '3.3'
+
+services:
+  tomcat-db-api3:
+    container_name: tomcat-db-api3
+    image: api-image-3
+    build:
+      context: .
+    # ports:
+    #   - "8083:8083"
+    volumes:
+      - volume2:/var/lib/postgres/data
+    environment:
+      DB_IP: db-moncom-devices
+      DB_PORT: 5432
+      DB_USERNAME: postgres
+      DB_PASSWORD: 1q2w3e4r
+      DB_DBNAME: moncom-devices-db  # Numele bazei de date pentru devices
+
+      RABBITMQ_HOST: localhost
+#      RABBITMQ_PORT: 5672
+#      RABBITMQ_USERNAME: guest
+#      RABBITMQ_PASSWORD: guest
+#      RABBITMQ_QUEUE_DEVICE_NAME: device_queue                          # Coada pentru device
+#      RABBITMQ_QUEUE_SENSOR_NAME: device_energy_consumption_queue        # Coada pentru consumul de energie
+#      RABBITMQ_EXCHANGE_NAME: device_data
+
+    depends_on:
+      - db-moncom-devices
+    networks:
+      - demo_net
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.tomcat-db-api3.rule=Host(`tomcat-db-api3.localhost`)"
+      - "traefik.http.services.tomcat-db-api3.loadbalancer.server.port=8083"
+
+
+  db-moncom-devices:
+    image: postgres:13-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: 1q2w3e4r
+      POSTGRES_DB: moncom-devices-db
+    ports:
+      - "5435:5432"
+    networks:
+      - demo_net
+
+
+
+networks:
+  demo_net:
+    external: true
+
+volumes:
+  volume2:
+  rabbitmq2_data:
+  rabbitmq2_logs:
+
+

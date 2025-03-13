@@ -1,0 +1,54 @@
+#version: '3'
+#services:
+#  react-app:
+#    image: fe-image
+#    build:
+#      context: .
+#      dockerfile: Dockerfile
+#    ports:
+#      - "3000:3000"  # Mapează portul 3000 de pe gazdă la portul 80 din container
+#    networks:
+#      - demo_net
+#
+#networks:
+#  demo_net:
+#    external: true
+#
+version: '3.3'
+
+networks:
+  demo_net:
+    external: true  # Indicates that this network is managed externally (already created outside this compose file)
+
+services:
+  reverse-proxy:
+    image: traefik:v3.2
+    command:
+      - --api.insecure=true
+      - --api.dashboard=true
+      - --providers.docker
+      - --accesslog=true
+      - --accesslog.filepath=/var/log/traefik/access.log
+      - --log.level=DEBUG
+      - --entrypoints.web.address=:80
+    ports:
+      - "80:80"
+      - "8080:8080"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - traefik_logs:/var/log/traefik
+    networks:
+      - demo_net
+
+  react-app:
+    image: fe-image
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"  # Optional, only needed for local testing
+    networks:
+      - demo_net
+
+volumes:
+  traefik_logs:

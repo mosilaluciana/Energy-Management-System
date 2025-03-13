@@ -1,0 +1,74 @@
+version: '3.3'
+
+services:
+  tomcat-db-api2:
+    container_name: tomcat-db-api2
+    image: api-image-2
+    build:
+      context: .
+   # ports:
+   #   - "8081:8081"
+    volumes:
+      - volume2:/var/lib/postgres/data
+    environment:
+      DB_IP: db-device
+      DB_PORT: 5432
+      DB_USERNAME: postgres
+      DB_PASSWORD: 1q2w3e4r
+      DB_DBNAME: devices-db
+
+      RABBITMQ_HOST: localhost
+#      RABBITMQ_PORT: 5672
+#      RABBITMQ_USERNAME: guest
+#      RABBITMQ_PASSWORD: guest
+#      RABBITMQ_QUEUE_NAME: device_queue            # Coada pentru device
+#      RABBITMQ_EXCHANGE_NAME: device_data          # Exchange pentru device
+#      RABBITMQ_ROUTING_KEY: device_routing_key     # Routing key pentru device
+
+    depends_on:
+      - db-device
+    networks:
+      - demo_net
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.tomcat-db-api2.rule=Host(`tomcat-db-api2.localhost`)"
+      - "traefik.http.services.tomcat-db-api2.loadbalancer.server.port=8081"
+
+
+
+  rabbitmq:
+    image: rabbitmq:4.0.3-management
+    container_name: rabbitmq
+    ports:
+      - "5672:5672"    # AMQP port for communication
+      - "15672:15672"  # RabbitMQ management UI
+    environment:
+      RABBITMQ_HOST: localhost
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq/
+      - rabbitmq_logs:/var/log/rabbitmq
+    networks:
+      - demo_net
+
+
+  db-device:
+    image: postgres:13-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: 1q2w3e4r
+      POSTGRES_DB: devices-db 
+    ports:
+      - "5434:5432" 
+    networks:
+      - demo_net
+
+networks:
+  demo_net:
+    external: true
+
+volumes:
+  volume2:
+  rabbitmq_data:
+  rabbitmq_logs:
